@@ -1,0 +1,70 @@
+[project]
+name = "video-analysis"
+version = "0.1.0"
+description = "Video transcription, speaker diarization, and LLM analysis pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    # API surface
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",   # multipart/form-data uploads on POST /analyze-video
+    # Configuration and data contracts
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    # Ingestion
+    "yt-dlp>=2024.12.13",
+    # Speech
+    "deepgram-sdk>=3.7.0",
+    # Analysis
+    "openai>=1.60.0",
+    "tiktoken>=0.8.0",
+    # Transport / resilience
+    "httpx>=0.27.0",
+    "tenacity>=9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# ---------------------------------------------------------------------------
+# Test configuration
+#
+# AD-2: the unit suite must run with zero API keys. Network-dependent tests are
+# marked `integration` and excluded by default via addopts, so a bare `pytest`
+# is always safe to run on a fresh clone.
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not integration' --strict-markers"
+markers = [
+    "integration: requires live API keys and network access (deselected by default)",
+]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+disallow_untyped_defs = true

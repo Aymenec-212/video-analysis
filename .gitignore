@@ -1,0 +1,28 @@
+# Secrets — .env.example is committed, .env is never
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Working media — reproducible from source
+tmp/
+*.mp4
+*.mkv
+*.webm
+*.m4a
+
+# Deepgram response cache (AD-2). Curated fixtures under tests/fixtures/
+# ARE committed — they are what lets the unit suite run without keys.
+.cache/
+
+.DS_Store
