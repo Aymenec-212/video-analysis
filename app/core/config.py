@@ -15,7 +15,6 @@ danger lives in the `extra_params` escape hatch — a future maintainer adding
 `diarize=true` there without knowing it is deprecated. That case is guarded
 explicitly against a reserved-key list.
 
-Verified against Deepgram documentation on 2026-08-25 (SPEC 3).
 """
 
 from __future__ import annotations
@@ -75,7 +74,9 @@ class DeepgramConfig(BaseModel):
 
     smart_format: bool = True
     punctuate: bool = True
-   
+
+    #: Requested as a cross-check against our own segmentation (AD-3), never as
+    #: the source of truth for speaker attribution.
     utterances: bool = True
 
     language_mode: LanguageMode = LanguageMode.DETECT
@@ -92,8 +93,9 @@ class DeepgramConfig(BaseModel):
     #: RESERVED_QUERY_PARAMS.
     extra_params: dict[str, str] = Field(default_factory=dict)
 
-    #: Deepgram returns 504 past 10 minutes of *processing* time.
-    #  Our client timeout sits just above it.
+    #: Deepgram returns 504 past 10 minutes of *processing* time(SPEC 3.4).
+    #: Our client timeout sits just above that so the
+    #: server's own error surfaces rather than a local timeout masking it.
     timeout_sec: float = 660.0
     max_retries: int = 3
     backoff_base_sec: float = 1.0
@@ -200,9 +202,20 @@ class SegmentationConfig(BaseModel):
 
     #: Cut a segment when the silence between two words exceeds this.
     pause_threshold_sec: float = 0.7
-    #: Upper bound on a segment, applied at a sentence boundary.
+
+    #: Soft ceiling: past this, cut at the next sentence boundary so segments
+    #: break where a reader would expect.
     max_segment_sec: float = 30.0
 
+    #: Hard ceiling, applied even mid-sentence. Without it, speech that never
+    #: reaches a sentence boundary — unpunctuated output, a long uninterrupted
+    #: monologue — would grow into a single unbounded segment.
+    hard_max_segment_sec: float = 60.0
+
+    #: AD-4: ships disabled. Enabled only if the measured `speaker_confidence`
+    #: distribution shows short speaker flips actually cluster at low confidence.
+    #: A heuristic added before the problem is demonstrated is an untested
+    #: assumption wearing the costume of a fix.
     smoothing_enabled: bool = False
     smoothing_max_turn_sec: float = 1.0
     smoothing_min_confidence: float = 0.5
@@ -212,6 +225,7 @@ class AnalysisConfig(BaseModel):
     """LLM map-reduce configuration (AD-7, AD-8)."""
 
     #: SPEC 11 open question 3: pin exact model IDs at implementation time.
+    #: Config-driven so switching is an env change, not a code change.
     map_model: str = "gpt-5-mini"
     reduce_model: str = "gpt-5"
 
@@ -223,6 +237,8 @@ class AnalysisConfig(BaseModel):
     #: Bounded concurrency for the map stage.
     map_concurrency: int = 5
 
+    #: Reduce folds in batches until one result remains. A single reduce call over
+    #: every chunk summary would recreate the problem the brief asks us to solve.
     reduce_batch_size: int = 8
 
     max_retries: int = 3

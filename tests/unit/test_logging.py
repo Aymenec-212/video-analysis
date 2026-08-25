@@ -71,6 +71,34 @@ class TestRedaction:
         payload = json.loads(JSONFormatter().format(_record(video_id="abc123")))
         assert payload["video_id"] == "abc123"
 
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("cache_key", "6a95a3710fe0_c3484dfa"),
+            ("key", "6a95a3710fe0_c3484dfa"),
+            ("key_points", ["a", "b"]),
+            ("keyterm", "diarization"),
+            ("keywords", ["ai"]),
+        ],
+    )
+    def test_safe_names_containing_a_marker_survive(
+        self, field: str, value: object
+    ) -> None:
+        """Default-deny redaction must not eat non-credential fields.
+
+        `cache_key` is the identifier that makes a cache miss diagnosable, and
+        `key_points` is a required output field. Redacting either is a bug.
+        """
+        payload = json.loads(JSONFormatter().format(_record(**{field: value})))
+        assert payload[field] == value
+
+    def test_new_credential_names_are_redacted_without_being_enumerated(self) -> None:
+        """The allow list is narrow; anything else matching a marker is redacted."""
+        payload = json.loads(
+            JSONFormatter().format(_record(some_new_service_key="sk-live-123"))
+        )
+        assert payload["some_new_service_key"] == "***redacted***"
+
 
 class TestHumanFormatter:
     def test_message_and_context_both_appear(self) -> None:

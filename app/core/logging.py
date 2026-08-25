@@ -36,7 +36,34 @@ _STANDARD_RECORD_FIELDS = frozenset(
 #: something each call site has to remember.
 _SENSITIVE_KEY_MARKERS = ("key", "token", "secret", "password", "authorization")
 
+#: Field names that contain a sensitive marker but carry nothing sensitive.
+#: Default-deny with an explicit allow list, rather than trying to enumerate
+#: every dangerous name: a new credential field is redacted automatically, while
+#: these known-safe names stay readable.
+#:
+#: `cache_key` and `key_points` are the cases that matter. Redacting the cache
+#: key removes the only identifier that makes a cache miss diagnosable, and
+#: `key_points` is a required output field, not a credential.
+_SAFE_CONTEXT_KEYS = frozenset(
+    {
+        "cache_key",
+        "key",
+        "key_points",
+        "keyterm",
+        "keyterms",
+        "keywords",
+        "public_key",
+    }
+)
+
 _REDACTED = "***redacted***"
+
+
+def _is_sensitive(name: str) -> bool:
+    lowered = name.lower()
+    if lowered in _SAFE_CONTEXT_KEYS:
+        return False
+    return any(marker in lowered for marker in _SENSITIVE_KEY_MARKERS)
 
 
 def _extract_context(record: logging.LogRecord) -> dict[str, Any]:
@@ -45,11 +72,7 @@ def _extract_context(record: logging.LogRecord) -> dict[str, Any]:
     for key, value in record.__dict__.items():
         if key in _STANDARD_RECORD_FIELDS or key.startswith("_"):
             continue
-        lowered = key.lower()
-        if any(marker in lowered for marker in _SENSITIVE_KEY_MARKERS):
-            context[key] = _REDACTED
-        else:
-            context[key] = value
+        context[key] = _REDACTED if _is_sensitive(key) else value
     return context
 
 

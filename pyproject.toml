@@ -15,8 +15,7 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     # Ingestion
     "yt-dlp>=2024.12.13",
-    # Speech
-    "deepgram-sdk>=3.7.0",
+    # Speech: called over REST with httpx (AD-11) — no vendor SDK
     # Analysis
     "openai>=1.60.0",
     "tiktoken>=0.8.0",
@@ -69,8 +68,9 @@ strict = true
 warn_return_any = true
 disallow_untyped_defs = true
 
-# we tell mypy to stop flagging about missing type info ONLY for yt-dlp, 
-# while keeping strict type check for everything else
+# yt-dlp ships no type information. Scoped to this one library so the strictness
+# guarantee holds everywhere else; our own boundary converts its `dict[str, Any]`
+# into the typed MediaSource immediately.
 [[tool.mypy.overrides]]
 module = ["yt_dlp.*"]
 ignore_missing_imports = true
