@@ -68,3 +68,9 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 disallow_untyped_defs = true
+
+# we tell mypy to stop flagging about missing type info ONLY for yt-dlp, 
+# while keeping strict type check for everything else
+[[tool.mypy.overrides]]
+module = ["yt_dlp.*"]
+ignore_missing_imports = true

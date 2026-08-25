@@ -112,3 +112,55 @@ class TestBoundLogger:
             get_logger("app.test").bind(stage="audio").info("working", extra={"stage": "stt"})
 
         assert caplog.records[-1].stage == "stt"  # type: ignore[attr-defined]
+
+
+class TestKeywordContextAPI:
+    """Regression: keyword arguments must reach the record as structured context.
+
+    `LoggerAdapter` forwards unrecognised keywords to `Logger._log`, which
+    rejects them with a TypeError. Every call site in the pipeline uses this
+    form, so without folding them into `extra` a logging call inside an error
+    path would itself raise — masking the original failure.
+    """
+
+    def test_keyword_arguments_become_context(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.INFO):
+            get_logger("app.test").info("probed", duration=12.5, streams=2)
+
+        record = caplog.records[-1]
+        assert record.duration == 12.5  # type: ignore[attr-defined]
+        assert record.streams == 2  # type: ignore[attr-defined]
+
+    def test_keyword_arguments_combine_with_bound_context(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.INFO):
+            get_logger("app.test").bind(video_id="abc").warning("failed", returncode=1)
+
+        record = caplog.records[-1]
+        assert record.video_id == "abc"  # type: ignore[attr-defined]
+        assert record.returncode == 1  # type: ignore[attr-defined]
+
+    def test_exc_info_is_still_treated_as_a_logging_directive(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Standard logging keywords must not be swallowed into context."""
+        with caplog.at_level(logging.ERROR):
+            try:
+                raise ValueError("boom")
+            except ValueError:
+                get_logger("app.test").error("failed", exc_info=True, stage="audio")
+
+        record = caplog.records[-1]
+        assert record.exc_info is not None
+        assert record.stage == "audio"  # type: ignore[attr-defined]
+
+    def test_secrets_passed_as_keywords_are_still_redacted(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.INFO):
+            get_logger("app.test").info("calling", api_key="sk-live-secret")
+
+        assert "sk-live-secret" not in JSONFormatter().format(caplog.records[-1])

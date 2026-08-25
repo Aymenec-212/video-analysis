@@ -1,4 +1,4 @@
-"""Tests for the error taxonomy (SPEC §6.3, AD-9)."""
+"""Tests for the error taxonomy (SPEC 6.3, AD-9)."""
 
 from __future__ import annotations
 

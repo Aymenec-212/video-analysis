@@ -87,8 +87,19 @@ class HumanFormatter(logging.Formatter):
         return base
 
 
+#: Keyword arguments the stdlib logging methods consume. Anything else a caller
+#: passes is structured context, not a logging directive.
+_LOGGING_KWARGS = frozenset({"exc_info", "stack_info", "stacklevel", "extra"})
+
+
 class BoundLogger(logging.LoggerAdapter):  # type: ignore[type-arg]
-    """A logger carrying persistent structured context."""
+    """A logger carrying persistent structured context.
+
+    Supports `log.info("message", key=value)` directly. `LoggerAdapter` passes
+    unrecognised keyword arguments through to `Logger._log`, which rejects them,
+    so they are folded into `extra` here instead. Requiring callers to write
+    `extra={...}` by hand would be noisier and easy to forget.
+    """
 
     @property
     def context(self) -> dict[str, Any]:
@@ -102,7 +113,11 @@ class BoundLogger(logging.LoggerAdapter):  # type: ignore[type-arg]
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
-        call_extra = kwargs.get("extra") or {}
+        call_extra = dict(kwargs.pop("extra", None) or {})
+
+        for key in [k for k in kwargs if k not in _LOGGING_KWARGS]:
+            call_extra[key] = kwargs.pop(key)
+
         # Per-call context wins, so a caller can override a bound value.
         kwargs["extra"] = {**self.context, **call_extra}
         return msg, kwargs
