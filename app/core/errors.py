@@ -45,7 +45,10 @@ class StageStatus(StrEnum):
 
 
 class ErrorCode(StrEnum):
-    """failure identifiers (SPEC 6.3).
+    """Stable, machine-readable failure identifiers (SPEC 6.3).
+
+    These are part of the public API contract. Values must not change once
+    published; add new members rather than renaming existing ones.
     """
 
     INVALID_URL = "INVALID_URL"
@@ -59,6 +62,8 @@ class ErrorCode(StrEnum):
     NO_SPEECH_DETECTED = "NO_SPEECH_DETECTED"
     ANALYSIS_FAILED = "ANALYSIS_FAILED"
     CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
+    UNSUPPORTED_CONTENT_TYPE = "UNSUPPORTED_CONTENT_TYPE"
+    INVALID_REQUEST = "INVALID_REQUEST"
 
 
 #: HTTP status per error code. The two 200s are the design statement of AD-9:
@@ -76,13 +81,15 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.NO_SPEECH_DETECTED: 200,
     ErrorCode.ANALYSIS_FAILED: 200,
     ErrorCode.CONFIGURATION_ERROR: 500,
+    ErrorCode.UNSUPPORTED_CONTENT_TYPE: 415,
+    ErrorCode.INVALID_REQUEST: 400,
 }
 
 
 class ErrorEntry(BaseModel):
     """A failure as it appears in the response `errors[]` array.
 
-    This is the serialisable form of a `PipelineError`, the shape the caller
+    This is the serialisable form of a `PipelineError` — the shape the caller
     sees, decoupled from the exception used internally.
     """
 
@@ -164,7 +171,9 @@ class PipelineError(Exception):
 class InvalidURLError(PipelineError):
     """Malformed URL, disallowed scheme, or an address we refuse to fetch.
 
-    Also covers private/loopback addresses blocked for SSRF safety.
+    Also covers private/loopback addresses blocked for SSRF safety — deliberately
+    not distinguished in the public code, so the API does not confirm to a caller
+    whether an internal host exists.
     """
 
     code = ErrorCode.INVALID_URL
@@ -183,7 +192,8 @@ class UnsupportedURLError(PipelineError):
 class SourceUnavailableError(PipelineError):
     """The video exists as a URL but cannot be retrieved.
 
-    Removed, private, geo-blocked, age-gated, or behind a bot check.
+    Removed, private, geo-blocked, age-gated, or behind a bot check. Bot checks
+    are an expected failure when running from shared cloud IPs such as Colab.
     """
 
     code = ErrorCode.SOURCE_UNAVAILABLE
@@ -223,7 +233,7 @@ class NoAudioStreamError(PipelineError):
 class UnreadableMediaError(PipelineError):
     """ffprobe or FFmpeg cannot decode the file.
 
-    Corrupt, truncated, or not media at all, an extension proves nothing, which
+    Corrupt, truncated, or not media at all — an extension proves nothing, which
     is why uploads are validated by probing rather than by filename.
     """
 
@@ -252,7 +262,8 @@ class NoSpeechDetectedError(PipelineError):
     """Transcription succeeded and found no speech.
 
     Non-fatal (200). This is a correct answer about silent or music-only audio,
-    not a malfunction.
+    not a malfunction. Reporting it as an error would be a lie in the opposite
+    direction from fabrication, but a lie nonetheless.
     """
 
     code = ErrorCode.NO_SPEECH_DETECTED
@@ -266,11 +277,13 @@ class NoSpeechDetectedError(PipelineError):
 
 
 class AnalysisFailedError(PipelineError):
-    """The LLM stage failed; the transcript passed.
+    """The LLM stage failed; the transcript survives.
 
     Non-fatal (200). The response keeps the full transcript and sets `summary`
     to null with empty `key_points` and `topics`. This is the single most
-    important behaviour in the taxonomy.
+    important behaviour in the taxonomy: the alternative — returning a plausible
+    summary generated without a working analysis stage — is exactly what the
+    brief forbids.
     """
 
     code = ErrorCode.ANALYSIS_FAILED
@@ -283,10 +296,30 @@ class AnalysisFailedError(PipelineError):
 # ---------------------------------------------------------------------------
 
 
+class UnsupportedContentTypeError(PipelineError):
+    """The request body is neither JSON nor multipart form data."""
+
+    code = ErrorCode.UNSUPPORTED_CONTENT_TYPE
+    stage = Stage.INGESTION
+    default_message = (
+        "Send either application/json with a url field, or multipart/form-data "
+        "with a file part."
+    )
+
+
+class InvalidRequestError(PipelineError):
+    """The body has the right content type but the wrong contents."""
+
+    code = ErrorCode.INVALID_REQUEST
+    stage = Stage.INGESTION
+    default_message = "The request body could not be interpreted."
+
+
 class ConfigurationError(PipelineError):
     """Invalid or missing configuration detected before any work is attempted.
 
-    Raised at startup.
+    Raised at startup or on first use — never mid-pipeline — so that a
+    misconfigured deployment fails loudly instead of degrading quietly.
     """
 
     code = ErrorCode.CONFIGURATION_ERROR
@@ -300,6 +333,7 @@ __all__ = [
     "ConfigurationError",
     "ErrorCode",
     "ErrorEntry",
+    "InvalidRequestError",
     "InvalidURLError",
     "MediaTooLargeError",
     "MediaTooLongError",
@@ -311,5 +345,6 @@ __all__ = [
     "Stage",
     "StageStatus",
     "UnreadableMediaError",
+    "UnsupportedContentTypeError",
     "UnsupportedURLError",
 ]
