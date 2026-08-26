@@ -229,12 +229,18 @@ class AnalysisConfig(BaseModel):
     map_model: str = "gpt-5-mini"
     reduce_model: str = "gpt-5"
 
-    #: Chunks are cut on segment boundaries, never mid-utterance (AD-7).
+    #: Chunks are cut on segment boundaries, never mid-utterance (AD-7). The
+    #: budget covers transcript content; the prompt template adds a small
+    #: constant on top, well inside the model's context.
     chunk_token_budget: int = 2000
     chunk_overlap_segments: int = 1
-    encoding_name: str = "cl100k_base"
 
-    #: Bounded concurrency for the map stage.
+    #: Measured: tiktoken maps the gpt-5 family to `o200k_base`. `cl100k_base`
+    #: is the GPT-4/3.5 vocabulary and would miscount every chunk.
+    encoding_name: str = "o200k_base"
+
+    #: Bounded concurrency for the map stage. Conservative starting point; tuned
+    #: from measured throughput rather than guessed upward.
     map_concurrency: int = 5
 
     #: Reduce folds in batches until one result remains. A single reduce call over

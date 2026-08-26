@@ -13,8 +13,12 @@ predictable, which is why tests assert bounds rather than values.
 
 from __future__ import annotations
 
+import asyncio
 import random
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Coroutine, Iterator, Sequence
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 #: Ceiling on any single delay. Without it, exponential growth on a long retry
 #: budget produces waits longer than the request timeout they are protecting.
@@ -48,4 +52,66 @@ def backoff_delays(
         yield random.uniform(0.0, capped) if jitter else capped
 
 
-__all__ = ["MAX_DELAY_SEC", "backoff_delays"]
+__all__ = ["MAX_DELAY_SEC", "backoff_delays", "gather_bounded", "retry_async"]
+
+
+async def gather_bounded(
+    limit: int,
+    coroutines: Sequence[Coroutine[Any, Any, T]],
+    *,
+    return_exceptions: bool = False,
+) -> list[T | BaseException]:
+    """Await coroutines with at most `limit` running at once.
+
+    A plain `asyncio.gather` over every chunk of a long transcript would fire
+    dozens of simultaneous LLM requests and collect rate limits for the trouble.
+    The semaphore bounds in-flight work while still overlapping it.
+
+    Coroutines are cheap until awaited, so wrapping them here does not start
+    anything early.
+    """
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+
+    semaphore = asyncio.Semaphore(limit)
+
+    async def guarded(coroutine: Coroutine[Any, Any, T]) -> T:
+        async with semaphore:
+            return await coroutine
+
+    return list(
+        await asyncio.gather(
+            *(guarded(c) for c in coroutines), return_exceptions=return_exceptions
+        )
+    )
+
+
+async def retry_async(
+    operation: Callable[[], Awaitable[T]],
+    *,
+    attempts: int,
+    base_sec: float,
+    retry_on: tuple[type[BaseException], ...] = (Exception,),
+) -> T:
+    """Run `operation`, retrying transient failures with jittered backoff.
+
+    Takes a factory rather than a coroutine because a coroutine can only be
+    awaited once — retrying would raise `RuntimeError` instead of retrying.
+
+    Exceptions outside `retry_on` propagate immediately. A malformed request does
+    not become valid by being sent again, and retrying it wastes the caller's
+    time to reach the same answer.
+    """
+    delays = list(backoff_delays(attempts, base_sec))
+    last: BaseException | None = None
+
+    for attempt in range(attempts):
+        try:
+            return await operation()
+        except retry_on as exc:
+            last = exc
+            if attempt < len(delays):
+                await asyncio.sleep(delays[attempt])
+
+    assert last is not None  # unreachable: the loop either returns or sets `last`
+    raise last
