@@ -232,25 +232,34 @@ def summarise(outcomes: list[Outcome], wall_sec: float) -> None:
             f"{'yes' if o.body.get('degraded') else 'no':>5} {o.elapsed_sec:>6.1f}s"
         )
 
+    completed = [o for o in outcomes if o.http_status == 200]
+    failed = [o for o in outcomes if o.http_status != 200]
+
     sequential = sum(o.elapsed_sec for o in outcomes)
-    floor = max((o.elapsed_sec for o in outcomes), default=0.0)
+    # The floor is derived from cases that actually completed. A client timeout
+    # reports its own timeout value as elapsed, so including it would make the
+    # timeout the floor and read as 100% efficiency — reporting a failed run as
+    # a perfect one.
+    floor = max((o.elapsed_sec for o in completed), default=0.0)
+
     if wall_sec > 0:
         print(
             f"\nwall clock {wall_sec:.1f}s vs {sequential:.1f}s sequential "
             f"({sequential / wall_sec:.1f}x overlap)"
         )
-        if floor > 0:
-            # No batch finishes faster than its slowest member, so raw speedup
-            # is capped by workload shape rather than by the server. Efficiency
-            # against that floor is the number that says whether requests
-            # actually overlapped.
+        if failed:
+            print(
+                f"WARNING: {len(failed)} case(s) did not complete "
+                f"({', '.join(o.case.name for o in failed)}). "
+                f"Timing for this run is not comparable."
+            )
+        elif floor > 0:
             print(
                 f"longest single case {floor:.1f}s -> theoretical floor; "
                 f"achieved {floor / wall_sec:.0%} of it"
             )
 
-    ok = sum(1 for o in outcomes if o.http_status == 200)
-    print(f"{ok}/{len(outcomes)} returned 200")
+    print(f"{len(completed)}/{len(outcomes)} returned 200")
 
     matched = [
         o

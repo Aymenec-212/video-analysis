@@ -1,0 +1,79 @@
+{
+  "label": "c3-r3",
+  "concurrency": 3,
+  "wall_sec": 934.49,
+  "sequential_sec": 1248.53,
+  "longest_case_sec": 900.16,
+  "cases": [
+    {
+      "name": "news-multi-speaker",
+      "route": "upload",
+      "http": 200,
+      "status": "success",
+      "elapsed_sec": 26.16,
+      "speakers": 3,
+      "expected_speakers": 6,
+      "segments": 10,
+      "chunks": 1,
+      "language": "fr",
+      "degraded": false,
+      "transcription_cached": true
+    },
+    {
+      "name": "interview-long-form",
+      "route": "upload",
+      "http": 200,
+      "status": "success",
+      "elapsed_sec": 132.01,
+      "speakers": 3,
+      "expected_speakers": 3,
+      "segments": 86,
+      "chunks": 3,
+      "language": "fr",
+      "degraded": true,
+      "transcription_cached": true
+    },
+    {
+      "name": "single-speaker-clean",
+      "route": "upload",
+      "http": 200,
+      "status": "success",
+      "elapsed_sec": 34.31,
+      "speakers": 2,
+      "expected_speakers": 1,
+      "segments": 8,
+      "chunks": 1,
+      "language": "en",
+      "degraded": false,
+      "transcription_cached": true
+    },
+    {
+      "name": "noisy-background",
+      "route": "upload",
+      "http": 200,
+      "status": "success",
+      "elapsed_sec": 155.88,
+      "speakers": 3,
+      "expected_speakers": 2,
+      "segments": 198,
+      "chunks": 4,
+      "language": "en",
+      "degraded": true,
+      "transcription_cached": true
+    },
+    {
+      "name": "upload-news-two-speaker",
+      "route": "upload",
+      "http": 0,
+      "status": "?",
+      "elapsed_sec": 900.16,
+      "speakers": null,
+      "expected_speakers": 2,
+      "segments": 0,
+      "chunks": null,
+      "language": null,
+      "degraded": false,
+      "transcription_cached": null
+    }
+  ]
+}

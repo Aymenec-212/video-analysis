@@ -325,6 +325,37 @@ exists.
 
 ---
 
+
+### Concurrency
+
+Five videos (114 s to 915 s) submitted as uploads against a warm cache, three
+repeats per level.
+
+| Request concurrency | Batch wall clock | Runs completing | Spread |
+|---|---|---|---|
+| 1 | 434–468 s | 3/3 | 1.1× |
+| 2 | **233–272 s** | 3/3 | 1.2× |
+| 3 | 140–487 s | 2/3 | 3.5× |
+| 5 | 165–252 s | 2/3 | 1.5× |
+
+The pipeline scales cleanly to concurrency 2, halving batch time with tight
+variance. Beyond that the constraint moves off the pipeline. At
+`map_concurrency=5`, three concurrent videos is up to 15 simultaneous LLM calls
+and five is up to 25; at those levels the heaviest case ranges from 114 s to a
+900 s client timeout and one run in three fails to complete.
+
+The best single result is 140 s at concurrency 3, 3.3× faster than sequential,
+but it is not reproducible on this API tier. **Concurrency 2 is the reliable
+operating point.** Lower `ANALYSIS__MAP_CONCURRENCY` to trade per-video latency
+for higher stable request concurrency.
+
+Deepgram is not the ceiling: it permits 100 concurrent requests per project, and
+transcription is cached across runs.
+
+**Output is deterministic.** Across all twelve runs each video produced an
+identical segment count — 10, 86, 8, 198, 118 — confirming identical audio
+yields an identical transcript.
+
 ## Evaluation
 
 Five real videos plus four failure cases, submitted concurrently against a
