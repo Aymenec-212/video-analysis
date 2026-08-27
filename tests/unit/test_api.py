@@ -408,6 +408,29 @@ class TestPartialSuccessPath:
         assert body["stages"]["transcription"] == "ok"
         assert body["degraded"] is True
 
+    async def test_degraded_always_carries_a_reason(
+        self, media_corpus: dict[str, Path]
+    ) -> None:
+        """A bare boolean tells a caller something is wrong and not what.
+
+        Segment overlap during crosstalk and an analysis built from partial
+        coverage set the same flag while meaning entirely different things.
+        """
+        llm = FakeLLM([AnalysisFailedError("model unavailable")])
+        body = await _upload(media_corpus["with_audio"], llm=llm, expect=200)
+
+        assert body["degraded_reasons"], "degraded with no explanation"
+        assert "analysis" in body["degraded_reasons"][0]
+
+    async def test_healthy_result_carries_no_reasons(
+        self, media_corpus: dict[str, Path]
+    ) -> None:
+        """The invariant runs both ways."""
+        body = await _upload(media_corpus["with_audio"], llm=working_llm())
+
+        assert body["degraded"] is False
+        assert body["degraded_reasons"] == []
+
     async def test_unexpected_errors_also_degrade(
         self, media_corpus: dict[str, Path]
     ) -> None:

@@ -112,6 +112,14 @@ class AnalyzeVideoResponse(BaseModel):
     #: unattributed speech, or segment defects.
     degraded: bool = False
 
+    #: Why. Non-empty whenever `degraded` is true, and empty whenever it is not.
+    #:
+    #: A boolean on its own tells a caller something is wrong and gives them no
+    #: way to find out what. Segment overlap during genuine crosstalk and an
+    #: analysis built from partial coverage both set the same flag while meaning
+    #: entirely different things, and only one of them is worth acting on.
+    degraded_reasons: list[str] = Field(default_factory=list)
+
     provenance: Provenance = Field(default_factory=Provenance)
 
 

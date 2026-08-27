@@ -1,5 +1,7 @@
 """Stage orchestration and the failure contract (AD-9).
 
+Six stages run in sequence; what distinguishes them is what happens when one
+fails.
 
 **Ingestion, audio and transcription are fatal.** If we cannot fetch the media,
 decode it, or transcribe it, there is no partial result worth returning — the
@@ -156,6 +158,9 @@ async def analyze_media(
     """
     stages: dict[Stage, StageStatus] = dict.fromkeys(Stage, StageStatus.SKIPPED)
     errors: list[ErrorEntry] = []
+    # Reasons accumulate as stages run, so `degraded` never reaches the caller
+    # as an unexplained boolean.
+    reasons: list[str] = []
     log = logger.bind(source="url" if request.url else "upload")
 
     # --- Fatal stages -----------------------------------------------------
@@ -172,14 +177,20 @@ async def analyze_media(
     transcript = build_transcript(speech.words, settings.segmentation)
     issues = validate_segments(transcript.segments)
     if issues:
-        # Our own construction produced these, so they indicate a bug in
-        # segmentation rather than bad input. Logged loudly; the transcript is
-        # still returned, because discarding it would hide the defect entirely.
-        log.error(
-            "segment validation found defects",
-            issue_count=len(issues),
-            kinds=sorted({i.kind.value for i in issues}),
+        # Overlap here is usually genuine crosstalk rather than a construction
+        # bug: our segments derive from provider word timings, so overlapping
+        # segments mean the provider emitted overlapping words. Reported rather
+        # than clamped, because clamping would erase a real property of the
+        # audio to make the output look tidier.
+        kinds = sorted({i.kind.value for i in issues})
+        log.warning("segment validation found defects", issue_count=len(issues), kinds=kinds)
+        reasons.append(
+            f"{len(issues)} segment boundary defect(s) ({', '.join(kinds)}), "
+            f"typically overlapping speech"
         )
+
+    if transcript.has_unattributed_speech:
+        reasons.append("some speech carries no speaker attribution")
     stages[Stage.DIARIZATION] = (
         StageStatus.DEGRADED
         if issues or transcript.has_unattributed_speech
@@ -215,6 +226,7 @@ async def analyze_media(
             stages={stage.value: status_.value for stage, status_ in stages.items()},
             errors=errors,
             degraded=degraded,
+            degraded_reasons=list(reasons) if degraded else [],
             provenance=provenance,
         )
 
@@ -238,6 +250,7 @@ async def analyze_media(
         stages[Stage.ANALYSIS] = StageStatus.FAILED
         errors.append(exc.to_entry())
         log.warning("analysis failed; transcript preserved", code=exc.code.value)
+        reasons.append("analysis stage failed; transcript returned without summary")
         return build(AnalysisStatus.PARTIAL_SUCCESS, None, degraded=True)
     except Exception as exc:  # noqa: BLE001 - see module docstring
         stages[Stage.ANALYSIS] = StageStatus.FAILED
@@ -250,6 +263,7 @@ async def analyze_media(
             )
         )
         log.exception("unexpected error during analysis; transcript preserved")
+        reasons.append("analysis stage failed; transcript returned without summary")
         return build(AnalysisStatus.PARTIAL_SUCCESS, None, degraded=True)
 
     partial_coverage = analysis.failed_chunks > 0
@@ -258,6 +272,10 @@ async def analyze_media(
     )
     if partial_coverage:
         log.warning("analysis built from partial coverage", failed=analysis.failed_chunks)
+        reasons.append(
+            f"{analysis.failed_chunks} of {analysis.chunk_count} excerpts failed to "
+            f"analyse; summary is built from partial coverage"
+        )
 
     degraded = (
         partial_coverage
