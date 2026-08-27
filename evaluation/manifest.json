@@ -1,0 +1,61 @@
+[
+  {
+    "name": "news-multi-speaker",
+    "source": "https://youtu.be/45P34gxmXw4",
+    "profile": "French TV news package. Six speakers in 114s, four appearing once for under 12s each, across studio, street and field audio. The hardest diarization case in the set.",
+    "expected_speakers": 6
+  },
+  {
+    "name": "interview-long-form",
+    "source": "https://www.youtube.com/watch?v=Jjo32GuXqOs",
+    "profile": "French political interview, ~12 minutes. Exercises LLM chunking and hierarchical reduce, plus rapid crosstalk between host and guest.",
+    "expected_speakers": 3,
+    "route": "url"
+  },
+  {
+    "name": "single-speaker-clean",
+    "source": "http://www.youtube.com/watch?v=LFnu0iYwDFc",
+    "profile": "One English speaker, clean studio audio. Baseline transcription quality with diarization unambiguous, and the English half of the language-detection check.",
+    "expected_speakers": 1,
+    "route": "url"
+  },
+  {
+    "name": "noisy-background",
+    "source": "https://www.youtube.com/watch?v=et2QlIh_cyA",
+    "profile": "Two speakers over background noise and music, ~15 minutes. Robustness of STT and diarization, and the longest content in the set.",
+    "expected_speakers": 2,
+    "route": "url"
+  },
+  {
+    "name": "upload-news-two-speaker",
+    "source": "evaluation/media/news_two_speaker.mp4",
+    "profile": "A two-speaker French news segment submitted as a multipart upload rather than a URL, so both ingestion routes are covered. Upload titles derive from the filename, since an uploaded file carries no source metadata.",
+    "expected_speakers": 2
+  },
+  {
+    "name": "failure-silent-audio",
+    "source": "evaluation/media/silent.mp4",
+    "profile": "Audio containing no speech. Expects 200 with status no_speech, an empty transcript and summary null - the no-fabrication requirement demonstrated on real audio rather than asserted.",
+    "expected_speakers": 0
+  },
+  {
+    "name": "failure-corrupt-media",
+    "source": "evaluation/media/corrupt.mp4",
+    "profile": "A text file carrying a video extension. Expects 422 UNREADABLE_MEDIA, proving validation is by probe rather than by filename.",
+    "expected_speakers": null
+  },
+  {
+    "name": "failure-invalid-url",
+    "source": "file:///etc/passwd",
+    "profile": "Disallowed scheme. Expects 400 INVALID_URL, rejected before any network call.",
+    "expected_speakers": null,
+    "route": "url"
+  },
+  {
+    "name": "failure-unavailable",
+    "source": "https://www.youtube.com/watch?v=00000000000",
+    "profile": "Nonexistent video. Expects 422 SOURCE_UNAVAILABLE.",
+    "expected_speakers": null,
+    "route": "url"
+  }
+]

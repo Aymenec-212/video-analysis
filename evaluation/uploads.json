@@ -1,0 +1,32 @@
+[
+  {
+    "name": "news-multi-speaker",
+    "source": "evaluation/media/news-multi-speaker.mp4",
+    "profile": "French TV news package. Six speakers in 114s, four appearing once for under 12s each, across studio, street and field audio. The hardest diarization case in the set.",
+    "expected_speakers": 6
+  },
+  {
+    "name": "interview-long-form",
+    "source": "evaluation/media/interview-long-form.mp4",
+    "profile": "French political interview, ~12 minutes. Exercises LLM chunking and hierarchical reduce, plus rapid crosstalk between host and guest.",
+    "expected_speakers": 3
+  },
+  {
+    "name": "single-speaker-clean",
+    "source": "evaluation/media/single-speaker-clean.mp4",
+    "profile": "One English speaker, clean studio audio. Baseline transcription quality with diarization unambiguous, and the English half of the language-detection check.",
+    "expected_speakers": 1
+  },
+  {
+    "name": "noisy-background",
+    "source": "evaluation/media/noisy-background.mp4",
+    "profile": "Two speakers over background noise and music, ~15 minutes. Robustness of STT and diarization, and the longest content in the set.",
+    "expected_speakers": 2
+  },
+  {
+    "name": "upload-news-two-speaker",
+    "source": "evaluation/media/news_two_speaker.mp4",
+    "profile": "A two-speaker French news segment submitted as a multipart upload rather than a URL, so both ingestion routes are covered. Upload titles derive from the filename, since an uploaded file carries no source metadata.",
+    "expected_speakers": 2
+  }
+]
