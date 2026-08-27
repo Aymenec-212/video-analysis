@@ -84,6 +84,7 @@ async def _fold_batch(
         attempt,
         attempts=max(1, config.max_retries),
         base_sec=config.backoff_base_sec,
+        label="reduce:fold",
     )
 
 

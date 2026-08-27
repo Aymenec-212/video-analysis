@@ -63,6 +63,7 @@ async def analyze_chunk(
         attempt,
         attempts=max(1, config.max_retries),
         base_sec=config.backoff_base_sec,
+        label=f"map:chunk-{chunk.index}",
     )
 
 

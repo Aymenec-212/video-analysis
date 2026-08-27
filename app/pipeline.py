@@ -211,6 +211,9 @@ async def analyze_media(
     def build(
         status: AnalysisStatus, analysis: Analysis | None, degraded: bool
     ) -> AnalyzeVideoResponse:
+        if analysis is not None:
+            provenance.chunk_count = analysis.chunk_count
+            provenance.failed_chunks = analysis.failed_chunks
         return AnalyzeVideoResponse(
             status=status,
             title=media.title,

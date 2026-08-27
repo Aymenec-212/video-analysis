@@ -18,6 +18,10 @@ import random
 from collections.abc import Awaitable, Callable, Coroutine, Iterator, Sequence
 from typing import Any, TypeVar
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 T = TypeVar("T")
 
 #: Ceiling on any single delay. Without it, exponential growth on a long retry
@@ -92,6 +96,7 @@ async def retry_async(
     attempts: int,
     base_sec: float,
     retry_on: tuple[type[BaseException], ...] = (Exception,),
+    label: str = "operation",
 ) -> T:
     """Run `operation`, retrying transient failures with jittered backoff.
 
@@ -101,6 +106,12 @@ async def retry_async(
     Exceptions outside `retry_on` propagate immediately. A malformed request does
     not become valid by being sent again, and retrying it wastes the caller's
     time to reach the same answer.
+
+    **Every retry is logged.** A silent retry loop hides provider pressure
+    completely: throughput measured under heavy rate limiting looks identical to
+    throughput measured with none, because the retries are absorbed before
+    anything observable happens. The log line is the only place that contention
+    becomes visible.
     """
     delays = list(backoff_delays(attempts, base_sec))
     last: BaseException | None = None
@@ -110,6 +121,14 @@ async def retry_async(
             return await operation()
         except retry_on as exc:
             last = exc
+            logger.warning(
+                "retrying after failure",
+                label=label,
+                attempt=attempt + 1,
+                of=attempts,
+                error_type=type(exc).__name__,
+                error=str(exc)[:160],
+            )
             if attempt < len(delays):
                 await asyncio.sleep(delays[attempt])
 

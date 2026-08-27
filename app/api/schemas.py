@@ -82,6 +82,12 @@ class Provenance(BaseModel):
     reduce_model: str | None = None
     transcription_cached: bool = False
 
+    #: Excerpts the transcript was split into for analysis, and how many failed.
+    #: Direct evidence for the brief's long-content requirement: a value above 1
+    #: shows the transcript was never sent to the model in a single prompt.
+    chunk_count: int = 0
+    failed_chunks: int = 0
+
 
 class AnalyzeVideoResponse(BaseModel):
     """The full analysis contract."""
